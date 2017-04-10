@@ -68,6 +68,7 @@ db.dbCollectionName.find({"writters.0":"Ethan Cohen"})
 ```
 
 ## Cursors
+
 * to access all the data returned by query we have to do the following
 
 ``` javascript
@@ -82,7 +83,9 @@ var doc = function(){ return c.hasNext() ? c.next() : null }
 c.objsleftInBatch()
 ```
 
-## Projection - use it if you want to return a certain filds in documents not all of them
+## Projection 
+
+* use it if you want to return a certain filds in documents not all of them
 
 ``` javascript
 db.dbCollectionName.find({"writters":"Ethan Cohen"}, {"writters":1})
