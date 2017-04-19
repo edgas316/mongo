@@ -339,6 +339,34 @@ db.movies.replaceOne(
 // this will find document with given id and replace its' data
 ```
 
+## To start your mongo using Wired Tiger engin do the following
+> create new directory where you will store your dbs and collections because WiredTiger can't read MMAP docs
+
+``` shell
+mkdir WT
+mongod -dbpath WT -storageEngine -wiredTiger
+```
+
+> then you can create collectin and write document
+
+``` shell 
+db.foo.insert({"name": "Edwin"})
+```
+
+> check if engine is wiredTiger
+
+``` shell
+db.foo.stats()
+```
+## Indexes
+
+> to create index on the collection use teh following command
+
+``` shell
+db.collectionName.createIndex({"name": 1, "some_otehr_valie": -1})
+```
+> 1 stands for descending order -1 ascending order 
+
 
 
 
