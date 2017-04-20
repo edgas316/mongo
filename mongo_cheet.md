@@ -361,12 +361,123 @@ db.foo.stats()
 ## Indexes
 
 > to create index on the collection use teh following command
+> 1 stands for descending order -1 ascending order
 
 ``` shell
 db.collectionName.createIndex({"name": 1, "some_otehr_valie": -1})
 ```
-> 1 stands for descending order -1 ascending order 
+> to create index on array elements use following
 
+``` shell
+db.collection.createIndex({"studend.name": 1})
+```
+
+> to avoid writing duplicate data we can create unique index
+> to create unique index use following command
+
+``` shell
+db.collection.createIndex({"student.name": 1}, {unique: true})
+```
+
+> suppose you have students collection with following documents structure:
+
+``` javascript
+{
+  _id:8mqmx98xm92x42942,
+  student_id: 0,
+  scores: [
+    {
+      type: "exame",
+      score: 88.9875776
+    },
+    {
+      type: "quiz",
+      score: 90.9875776
+    },
+    {
+      type: "homework",
+      score: 98.9875776
+    }
+  ],
+  class_id: 230
+}
+```
+
+> and you need to create index on scores 
+> and then search all docs with scores higher 88.5 and with type exam
+
+``` javascript
+// create index
+db.students.createIndex({"scores.score": 1})
+
+// check indexes
+db.students.getIndexes()
+
+// run query with explanation
+db.students.explain(true).find({"scores: {$elemMatch: {"type": "exam", score": {$gt: 88.5}}}})
+// true in explain will give more information on how many documents was touched by this querty
+```
+
+> suppose you have following data structure and you need to create unique index
+
+``` javascript
+{a: 1, b: 2, c: 3}
+{a: 4, b: 5, c: 6}
+{a: 7, b: 8}
+{a: 1, b: 2}
+```
+> if you try to create unique index on this collection it will errorout 
+> because on the documents where there is no "c" key it will see c:null
+> which means that these two documents has duplicate values
+> so to solve this poblem and still create unique index you need to give it sparse option
+> which will create unique id on the documents that contains "c" 
+> and avoid the ones that don't have them
+
+``` shell
+db.collection.createIndex({c:1}, {unique: true, sparse: true})
+```
+
+> you can run index creation on foreground (by default) or on background
+> foreground index creation block all other CRUD operations to the collection
+> background index creation doesn't block any CRUD operations
+> but you can run one index creation per collection at a time, others will be qued...
+
+``` shell
+db.collection.createIndex({"name": 1}, {background: true})
+```
+
+## explain verbosity
+> to have more understanding of what mongodb does 
+> when executing query we can use explain()
+
+``` javascript
+db.collection.explain().<operation>() // eg. find()
+db.collection.explain(true).<operation>() // eg. find()
+db.collection.explain("executionStats").<operation>() // eg. find()
+db.collection.explain("allPlansExecution").<operation>() // eg. find()
+```
+
+## Covered queries
+
+> covered queris are queries whre searched keys are indexed and projected
+> ex. 
+
+``` javascript
+var arr = [
+  {a: 1, b: 2, c: 3},
+  {a: 4, b: 5, c: 6},
+  {a: 7, b: 8, c: 9},
+  {a: 10, b: 11, c: 12}
+]
+```
+
+``` javascript
+db.collection.createIndex({a:1, b:1, c:1})
+
+// this query will search keys only without touching documents themself
+// which makes it covered and much more effecient
+db.collection.find({a:1, b:2}, {_id: 0, a: 1, b: 1})
+```
 
 
 
