@@ -479,6 +479,22 @@ db.collection.createIndex({a:1, b:1, c:1})
 db.collection.find({a:1, b:2}, {_id: 0, a: 1, b: 1})
 ```
 
+## Geospatial Indexes
+
+> find nearest document based on x,y coordinates
+
+``` javascript
+// suppose you have document with 'location' as x,y coordinates
+'location': [70, 100] // longitude, latitude
+db.collection.createIndex({location: '2d', type: 1})
+
+// or if it is real maps geolocation use following
+db.collection.createiIdex({'location': '2dsphere'})
+
+// to find nearest docs you use following query
+db.collection.find({'location': {$near: [67, 98]}}).limit(5)
+```
+
 
 
 
