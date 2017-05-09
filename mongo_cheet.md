@@ -612,6 +612,9 @@ mongotop 3
 ___
 
 ## Agregation Framework
+> the agregation framework is a set of analitics tools within mongodb that allows you to run varios types reports or analises on documents on one or more mongodb collections
+> it is based on concept of pipeline - the idea is we take input from mongodb collection and pass the documents from that collection threough one or more stages each of which performs different operations on its' inputs.
+> so it is Collection -> Stages -> Output
 
 
 
