@@ -493,8 +493,125 @@ db.collection.createiIdex({'location': '2dsphere'})
 
 // to find nearest docs you use following query
 db.collection.find({'location': {$near: [67, 98]}}).limit(5)
+
+// if geojson specs are used then query will look like this
+db.collection.find){
+  loc: {
+    $near: {
+      $geometry: {
+        type: "Piont",
+        coordinates: [-130, 39]
+      },
+      $maxDistance: 20000 // in meters
+    }
+  }
+}
 ```
 
+## Full Text Search Indexe
+
+``` javascript
+var doc = {
+  _id: ObjectId(123948761234jhg12349871234jhg),
+  words: 'dog tree ruby'
+}
+db.collection.createIndex({'words': 'text'}) // words is key from doc object text is type
+
+// now query
+// here you search by type 'text'
+// and this will return all documents with indexed 'words' string with 'dog' in them
+db.collection.find({$text: {$search: 'dog'}})
+
+// to sort returned documents by best search match we use following query
+db.collection.find({
+  $text: {$search: 'dog tree obisidian'}}, {score: {$meta: 'textScore'}
+}).sort({score: {$meta: 'textScore'}})
+```
+## Efficiency of index use
+
+> if you have multiple indexes you may need to force Mongo to use the most effecient index
+
+``` javascript
+// to do that you will need to use this query
+db.collection.find({student_id: {$gt: 500000}, class_id: 54}).sort({student_id: 1}).hint({class_id:1})
+// by doing this you will force Mongo to retrieve documents based on theyr class_id index and not by student_id which is much more effecient...
+```
+
+> make your DB smarter you have to create right indexes especially when we talk about compaund indexes
+
+``` javascript
+// let's assume we have following query
+db.students.find({student_id: {$tg: 500000}, class_id: 54}).sort({final_grade: 1}).hint({class_id: 1})
+
+// with the following compaund index
+db.students.createindex({class_id: 1, student_id: 1})
+
+// this will return all matching documents and total keys examined will be equal to number returned, but it will do inmemory sort!!! which is nor really good
+// to avoid this we will need to create smarter compaund index
+
+db.students.createIndex({
+  class_id: 1,    // equality field - this will elinate more than 90% of db
+  final_grade: 1, // sort field     - this will walk trhough the db in order and will return sorted result set
+  student_id: 1   // range field    - this will clear even more data returning only ones we need
+})
+// this will examine a very slitly more keys than return but it will perform sort in DB
+```
+
+> always check logs in mongod to determine slow queries
+
+## Profiler
+
+> system.profile has three options - 0 (which means off by default), 1 (which will log only slow qureries), 2 (which will log all queries, this one is more for general debugging purposes)
+
+``` javascript
+// "--profile 1" will tell mongod to log all slow queries "--slowms 2" means slower than 2 seconds
+mongod -dbpath /usr/local/var/mongodb --profile 1 --slowms 2
+
+// then if we want to see logs we need to run following query in mongo shell
+db.system.profile.find().pretty()
+
+// also we can use different type of queries
+// "ns" stands for namespace in "test" db and "foo" collection, "ts" is timestamp
+db.system.profile.find({ns:/test:foo/}).sort({ts:1}).pretty()
+
+db.system.profile.find({millis: {$gt: 1000}}).sort({ts: 1}).pretty()
+
+// this will printout the profiling level (eg. 0,1 or 2)
+db.getProfileingLevel()
+
+// this will show profiling status you've set up in mongod
+db.getProfilingStatus()
+
+
+// this will set profiling to level 1 and slower than 4 seconds
+db.setProfilingLevel(1,4)
+
+// to turn it off entirely 
+db.setProfilingLevel(0)
+``` 
+
+## Mongotop
+
+> mongotop will help you to see what your programm is doing and where mongo spending its time to identify slow queries
+
+``` javascript
+mongotop 3 
+// this will run mongo check every 3 seconds and will check what mongo spending most of its' time
+```
+
+## Mongostat
+
+> use "mongostat" to see whats ging on in your mongodb
+
+## Sharding and replica set
+
+> Sharding is a technic to split a large collection betwin multiple servers
+> mongo will use "mongos" as router, your app will talk to mongos and mongos will talk to the servers
+> to shard your collection you need to have shardkey
+> all your CRUD queries should have shardkey in them otherwise mongos will broadcast query to all servers
+======
+
+## Agregation Framework
 
 
 
