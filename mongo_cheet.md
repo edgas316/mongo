@@ -609,7 +609,7 @@ mongotop 3
 > mongo will use "mongos" as router, your app will talk to mongos and mongos will talk to the servers
 > to shard your collection you need to have shardkey
 > all your CRUD queries should have shardkey in them otherwise mongos will broadcast query to all servers
-======
+___
 
 ## Agregation Framework
 
