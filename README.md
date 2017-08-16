@@ -707,7 +707,7 @@ db.companies.aggregate([
   }}
 ])
 
-// this query ill produce all documents that has 'graylock' in array of funding rounds 
+// this query will produce all documents that has 'graylock' in array of funding rounds 
 // but if we want to filter out only fnuding rounds where 'graylock' was investor,
 // then we need to $unwind first and them match
 db.companies.aggregate([
@@ -859,21 +859,291 @@ db.companies.aggregate([
   }},
   {$sort: {average_number_of_employees: -1}}
 ])
+
+//===
+db.companies.aggregate([
+  {$match: {"relationships.person": {$ne: null}}},
+  {$project: {relationships: 1, _id: 0}},
+  {$unwind: "$relationships"},
+  {$group: {
+    _id: "$relationships.person",
+    count: {$sum: 1}
+  }},
+  {$sort: {count: -1}}
+
+  //===
+  db.companies.aggregate([
+    {$group: {
+      _id: {ipo_year: "$ipo.pub_year"},
+      companies: {$push: "$name"}
+    }},
+    {$sort: {"_id.ipo_year":1}}
+  ])
+]).pretty()
 ```
 
+### $group vs $project
+
+``` javascript
+db.companies.aggregate([
+  {$match: {funding_rounds: {$exists: true, $ne: []}}},
+  {$unwind: "$funding_rounds"},
+  {$sort: {
+    "funding_rounds.funded_year": 1,
+    "funding_rounds.funded_month": 1,
+    "funding_rounds.funded_day": 1
+    }
+  },
+  {$group: {
+    _id: {conpany: "$name"},
+    first_round: {$first: "$funding_rounds"},
+    last_round: {$last: "$funding_rounds"},
+    num_rounds: {$sum: 1},
+    total_raised: {$sum: "$funding_rounds.raised_ammount"}
+  }},
+  {$project: {
+    company: "$_id.company",
+    first_round: {
+      amount: "$first_round.raised_ammount",
+      article: "$first_round.source_url",
+      year: "$first_round.founded_year"
+    },
+    last_round: {
+      amount: "$last_round.raised_ammount".
+      article: "$last_round.source_url",
+      year: "$last_round.foudned_year"
+    },
+    num_rounds: 1,
+    total_raised: 1
+  }},
+  {$sort: {total_raised: -1}}
+]).pretty()
 
 
+//aggregation query that will determine the number of unique companies with which an individual has been associated.
+db.companies.aggregate([
+  { $project: { relationships: 1, _id: 0, name : 1, permalink: 1 } },
+  { $unwind: "$relationships" },
+  { $group: {
+      _id: { person: "$relationships.person" },
+      gross_companies: { $push : "$permalink" },
+      unique_companies: { $addToSet : "$permalink" }
+  } },
+  { $project: {
+      _id: 0,
+      person: "$_id.person",
+      gross_companies: 1,
+      unique_companies: 1,
+      unique_number_of_companies: { $size: "$unique_companies" },
+      gross_number_of_companies: { $size: "$gross_companies" }
+  } },
+  { $sort: { unique_number_of_companies: -1 } }
+]).pretty()
 
 
+// one more example using aggregation
+// document before aggregation
+{
+    "_id" : ObjectId("50b59cd75bed76f46522c392"),
+    "student_id" : 10,
+    "class_id" : 5,
+    "scores" : [
+        {
+            "type" : "exam",
+            "score" : 69.17634380939022
+        },
+        {
+            "type" : "quiz",
+            "score" : 61.20182926719762
+        },
+        {
+            "type" : "homework",
+            "score" : 73.3293624199466
+        },
+        {
+            "type" : "homework",
+            "score" : 15.206314042622903
+        },
+        {
+            "type" : "homework",
+            "score" : 36.75297723087603
+        },
+        {
+            "type" : "homework",
+            "score" : 64.42913107330241
+        }
+    ]
+}
+
+// aggregation query
+db.grades.aggregate( [
+{ $unwind : "$scores" },
+{ $match : { "scores.type" : { $ne : "quiz" } } },
+{ $group : { 
+  _id : { student_id : "$student_id", class_id : "$class_id" }, 
+  avg : { $avg : "$scores.score" } } 
+},
+{ $group : { 
+  _id : "$_id.class_id", 
+  avg : { $avg : "$avg" } } 
+},
+{ $sort : { "avg" : -1 } },
+{ $limit : 5 } ] )
+
+// document after aggregation
+{
+  "waitedMS": NumberLong("0"),
+  "result": [
+    {
+      "_id": 1,
+      "avg": 64.50642324269175
+    },
+    {
+      "_id": 5,
+      "avg": 58.084487676135495
+    },
+    {
+      "_id": 20,
+      "avg": 57.6309834548989
+    },
+    {
+      "_id": 26,
+      "avg": 56.06918278769094
+    },
+    {
+      "_id": 9,
+      "avg": 55.56861693456625
+    }
+  ],
+  "ok": 1
+}
 
 
+//For companies in our collection founded in 2004 and having 5 or more rounds of funding, calculate the average amount raised in each round of funding. Which company meeting these criteria raised the smallest average amount of money per funding round?
 
+db.companies.aggregate([
+    { $match: { founded_year: 2004 } },
+    { $project: {
+        _id: 0,
+        name: 1,
+        funding_rounds: 1,
+        num_rounds: { $size: "$funding_rounds" }
+    } },
+    { $match: { num_rounds: { $gte: 5 } } },
+    { $project: {
+        name: 1,
+        avg_round: { $avg: "$funding_rounds.raised_amount" }
+    } },
+    { $sort: { avg_round: 1 } }
+]).pretty()
+```
 
+## Application Engineering 
 
+### Replication 
+> write concerns - is when data is written to memory but not yet to the disc, and if, for some reason, your server goes down/crashes you will loose your data...
+> to eliminate that you want to set w (stands for write) and j (stands for jurnal) settings wich are by default w=1 and j=false, set j=true, in this case your write operations will be much slower but you will be sure that your data is written to disc...
+> also you might have some network errors - let say your write was successfull but because network error accured you received error and now you don't know if data was written or not, and the real problem with this when performing update operations. So the recommendation is to use create() operation instead...
 
+### Replica Set
+> Minimum replica set nodes quantity = 3
+> Type of replica set nodes: 
+* Regular - can be primery or secondary
+* Arbitrar - for voting 
+* Delayed - usually it is a disaster recovery node, it might be 1 or 2 hour behind other nodes, it can participate in voting but it can't become a primery node, so its' Priority is set to 0, P=0
+* Hidden - often used for analitics, it can participate in voting but it can't become a primery node, and not visible by app, so its' Priority is set to 0, P=0
 
+> run replica set on one machine use following command
 
+``` shell
+#!/usr/bin/env bash
 
+mkdir -p /data/rs1 /data/rs2 /data/rs3
+mongod --replSet m101 --logpath "1.log" --dbpath /data/rs1 --port 27017 --oplogSize 64 --smallfiles --fork 
+mongod --replSet m101 --logpath "2.log" --dbpath /data/rs2 --port 27018 --oplogSize 64 --smallfiles --fork
+mongod --replSet m101 --logpath "3.log" --dbpath /data/rs3 --port 27019 --oplogSize 64 --smallfiles --fork
+```
+> to see the status of replica nodes wether it is primary or secondary use following in mongo shell 
+
+``` shell 
+rs.status()
+```
+
+> to connect those three mongod instances into replica set create init_replica.js file with following script
+
+``` javascript
+config = { _id: "m101", members:[
+          { _id : 0, host : "localhost:27017"}, // or host:"Edvins-MacBook-Pro.local:30002"
+          { _id : 1, host : "localhost:27018"},
+          { _id : 2, host : "localhost:27019"} ]
+};
+
+rs.initiate(config);
+rs.status();
+```
+> then run 
+
+``` shell
+mongo < init_replica.js
+or
+mongo --port 27017 < init_replica.js
+```
+
+> to connect to any of those instances use following 
+
+``` shell
+mongo --port 27017
+```
+
+> to query secondary node use following command
+
+``` shell
+rs.slaveOk()
+```
+
+> to fidn what is running on the machine
+
+``` shell
+ps -ef | grep mongod
+```
+
+> to stop the server run this in mongo shell
+
+``` shell
+db.adminCommand({shutdown: 1, force: trueg})
+```
+
+> Replication supports mixed-mode storage engine. For example mmapv1 primary and wiredTiger secondary 
+
+### Connecting to replica set from Node.js driver
+
+> first you have to go over previos steps to be sure you have your replica set up and running and config file is properly runed as well
+> you also can go over those steps manually (not recommended)
+
+> run three instances of mongod on different hosts as
+
+``` shell
+mongod --port 30001 --replSet m101 --dbpath /data/rs1
+mongod --port 30002 --replSet m101 --dbpath /data/rs2
+mongod --port 30003 --replSet m101 --dbpath /data/rs3
+```
+
+> then run mongoshell with following commands
+
+``` shell 
+mongo localhost:30001
+rs.initiate()
+rs.add("Edvins-MacBook-Pro.local:30002")
+rs.add("Edvins-MacBook-Pro.local:30003")
+rs.status()
+'''
+
+> write concerns in driver
+> if you set w=1 will wait primery to acknoledge the write
+> if w=2 will wait for the primery and one secondary to acknoledge the write and etc.
+
+## Sharding
+> whey you have sharded environment you don't connect to replica anymore, rather you connect to 'mongos' and 'mongos' connects to the shard/replica set. 
 
 
 
